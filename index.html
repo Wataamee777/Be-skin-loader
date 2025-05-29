@@ -77,6 +77,12 @@
 <script>
 const skins = [];
 
+window.addEventListener('DOMContentLoaded', () => {
+  if (typeof skinview3d === 'undefined') {
+    console.error('skinview3d ライブラリが読み込まれていません');
+  }
+});
+
 async function fetchSkin() {
   const mode = document.getElementById('mode').value;
   const mcid = document.getElementById('mcid').value;
