@@ -4,11 +4,41 @@
   <meta charset="UTF-8">
   <title>BE/Javaスキンローダー</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://unpkg.com/skinview3d"></script>
+  <script src="https://cdn.jsdelivr.net/npm/skinview3d@1.15.0/build/skinview3d.min.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 1rem; }
-    .skin-entry { border: 1px solid #ccc; padding: 1rem; margin-bottom: 1rem; }
-    canvas { width: 200px; height: 300px; }
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      background-color: #f8f9fa;
+      color: #333;
+    }
+    h1 {
+      margin-bottom: 1rem;
+    }
+    select, input, button {
+      margin: 0.5rem 0.25rem;
+      padding: 0.5rem;
+      font-size: 1rem;
+    }
+    .skin-entry {
+      background-color: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    canvas {
+      width: 200px;
+      height: 300px;
+      margin-bottom: 1rem;
+    }
+    label, input[type="text"], input[type="checkbox"], button {
+      margin: 0.25rem 0;
+    }
   </style>
 </head>
 <body>
@@ -23,7 +53,6 @@
 
 <hr>
 <div id="skins"></div>
-<button onclick="generatePack()">スキンパック作成 (.mcpack)</button>
 
 <script>
 const skins = [];
@@ -64,13 +93,9 @@ async function fetchSkin() {
     label.textContent = "画像ファイル名: ";
     const input = document.createElement('input');
     input.value = fileName;
+    input.type = 'text';
     container.appendChild(label);
     container.appendChild(input);
-
-    const check = document.createElement('input');
-    check.type = 'checkbox';
-    container.appendChild(check);
-    container.appendChild(document.createTextNode(' パックに含める'));
 
     const dlBtn = document.createElement('button');
     dlBtn.textContent = "スキン単体Download";
@@ -79,7 +104,7 @@ async function fetchSkin() {
 
     document.getElementById('skins').appendChild(container);
 
-    skins.push({ name: mcid, base64, fileInput: input, selected: check });
+    skins.push({ name: mcid, base64, fileInput: input });
   } catch (e) {
     alert("取得に失敗しました。もう一度お試しください: " + e);
   }
@@ -90,67 +115,6 @@ function downloadSkin(base64, filename) {
   a.href = 'data:image/png;base64,' + base64;
   a.download = filename.endsWith('.png') ? filename : filename + '.png';
   a.click();
-}
-
-function generateUUID() {
-  return crypto.randomUUID();
-}
-
-function generatePack() {
-  const selected = skins.filter(s => s.selected.checked);
-  if (selected.length === 0) return alert("スキンを選んでください");
-
-  const zip = new JSZip();
-  const manifestUUID1 = generateUUID();
-  const manifestUUID2 = generateUUID();
-  const skinEntries = [];
-  const texts = [];
-
-  selected.forEach((s, i) => {
-    const fileName = s.fileInput.value.endsWith('.png') ? s.fileInput.value : s.fileInput.value + '.png';
-    console.log(`Adding skin file: ${fileName}`);
-    zip.file(fileName, atob(s.base64), { binary: true });
-    skinEntries.push({
-      localization_name: `skin_${i}`,
-      texture: fileName,
-      type: "free",
-      is_default: false
-    });
-    texts.push(`skin_${i}=${s.name}`);
-  });
-
-  const manifest = {
-    format_version: 1,
-    header: {
-      name: "pack.name",
-      uuid: manifestUUID1,
-      version: [1, 0, 0]
-    },
-    modules: [
-      {
-        type: "skin_pack",
-        uuid: manifestUUID2,
-        version: [1, 0, 0]
-      }
-    ]
-  };
-
-  const skinsJson = {
-    localization_name: "pack.name",
-    serialize_name: "pack.name",
-    skins: skinEntries
-  };
-
-  zip.file("manifest.json", JSON.stringify(manifest, null, 2));
-  zip.file("skins.json", JSON.stringify(skinsJson, null, 2));
-  zip.file("texts/en_US.lang", texts.join("\n"));
-
-  zip.generateAsync({ type: "blob" }).then(blob => {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = "スキンパック.mcpack";
-    a.click();
-  });
 }
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
