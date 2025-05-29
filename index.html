@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>BE/Javaスキンローダー</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://unpkg.com/skinview3d"></script>
+  <style>
+    body { font-family: sans-serif; padding: 1rem; }
+    .skin-entry { border: 1px solid #ccc; padding: 1rem; margin-bottom: 1rem; }
+    canvas { width: 200px; height: 300px; }
+  </style>
+</head>
+<body>
+<h1>BE/Javaスキンローダー</h1>
+
+<select id="mode">
+  <option value="be">BE</option>
+  <option value="java">Java</option>
+</select>
+<input id="mcid" placeholder="プレイヤー名を入力..." />
+<button onclick="fetchSkin()">取得</button>
+
+<hr>
+<div id="skins"></div>
+<button onclick="generatePack()">スキンパック作成 (.mcpack)</button>
+
+<script>
+const skins = [];
+
+async function fetchSkin() {
+  const mode = document.getElementById('mode').value;
+  const mcid = document.getElementById('mcid').value;
+  if (!mcid) return alert('プレイヤー名を入力してください');
+  let textureUrl = "";
+  let fileName = mcid + ".png";
+
+  try {
+    if (mode === "be") {
+      const xuidRes = await fetch(`https://api.geysermc.org/v2/xbox/xuid/${mcid}`);
+      const xuid = await xuidRes.text();
+      const skinRes = await fetch(`https://api.geysermc.org/v2/skin/${xuid}`);
+      const skinJson = await skinRes.json();
+      textureUrl = `https://textures.minecraft.net/texture/${skinJson.texture_id}`;
+    } else {
+      textureUrl = `https://mineskin.eu/skin/${mcid}.png`;
+    }
+
+    console.log("Texture URL:", textureUrl);
+
+    const response = await fetch(textureUrl);
+    const blob = await response.blob();
+    const arrayBuffer = await blob.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+    const container = document.createElement('div');
+    container.className = 'skin-entry';
+    const canvas = document.createElement('canvas');
+    container.appendChild(canvas);
+    const viewer = new skinview3d.SkinViewer({ canvas, width: 200, height: 300 });
+    viewer.loadSkin(textureUrl);
+
+    const label = document.createElement('label');
+    label.textContent = "画像ファイル名: ";
+    const input = document.createElement('input');
+    input.value = fileName;
+    container.appendChild(label);
+    container.appendChild(input);
+
+    const check = document.createElement('input');
+    check.type = 'checkbox';
+    container.appendChild(check);
+    container.appendChild(document.createTextNode(' パックに含める'));
+
+    const dlBtn = document.createElement('button');
+    dlBtn.textContent = "スキン単体Download";
+    dlBtn.onclick = () => downloadSkin(base64, input.value);
+    container.appendChild(dlBtn);
+
+    document.getElementById('skins').appendChild(container);
+
+    skins.push({ name: mcid, base64, fileInput: input, selected: check });
+  } catch (e) {
+    alert("取得に失敗しました。もう一度お試しください: " + e);
+  }
+}
+
+function downloadSkin(base64, filename) {
+  const a = document.createElement('a');
+  a.href = 'data:image/png;base64,' + base64;
+  a.download = filename.endsWith('.png') ? filename : filename + '.png';
+  a.click();
+}
+
+function generateUUID() {
+  return crypto.randomUUID();
+}
+
+function generatePack() {
+  const selected = skins.filter(s => s.selected.checked);
+  if (selected.length === 0) return alert("スキンを選んでください");
+
+  const zip = new JSZip();
+  const manifestUUID1 = generateUUID();
+  const manifestUUID2 = generateUUID();
+  const skinEntries = [];
+  const texts = [];
+
+  selected.forEach((s, i) => {
+    const fileName = s.fileInput.value.endsWith('.png') ? s.fileInput.value : s.fileInput.value + '.png';
+    console.log(`Adding skin file: ${fileName}`);
+    zip.file(fileName, atob(s.base64), { binary: true });
+    skinEntries.push({
+      localization_name: `skin_${i}`,
+      texture: fileName,
+      type: "free",
+      is_default: false
+    });
+    texts.push(`skin_${i}=${s.name}`);
+  });
+
+  const manifest = {
+    format_version: 1,
+    header: {
+      name: "pack.name",
+      uuid: manifestUUID1,
+      version: [1, 0, 0]
+    },
+    modules: [
+      {
+        type: "skin_pack",
+        uuid: manifestUUID2,
+        version: [1, 0, 0]
+      }
+    ]
+  };
+
+  const skinsJson = {
+    localization_name: "pack.name",
+    serialize_name: "pack.name",
+    skins: skinEntries
+  };
+
+  zip.file("manifest.json", JSON.stringify(manifest, null, 2));
+  zip.file("skins.json", JSON.stringify(skinsJson, null, 2));
+  zip.file("texts/en_US.lang", texts.join("\n"));
+
+  zip.generateAsync({ type: "blob" }).then(blob => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = "スキンパック.mcpack";
+    a.click();
+  });
+}
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+</body>
+</html>
