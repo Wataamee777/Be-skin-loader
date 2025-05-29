@@ -78,7 +78,7 @@
 const skins = [];
 
 window.addEventListener('DOMContentLoaded', () => {
-  if (typeof skinview3d === 'undefined') {
+  if (typeof SkinViewer === 'undefined') {
     console.error('skinview3d ライブラリが読み込まれていません');
   }
 });
@@ -112,7 +112,7 @@ async function fetchSkin() {
     container.className = 'skin-entry';
     const canvas = document.createElement('canvas');
     container.appendChild(canvas);
-    const viewer = new skinview3d.SkinViewer({ canvas, width: 200, height: 300 });
+    const viewer = new SkinViewer({ canvas, width: 200, height: 300 });
     viewer.loadSkin(textureUrl);
 
     const label = document.createElement('label');
