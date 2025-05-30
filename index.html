@@ -3,8 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <title>BE/Javaスキンローダー</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/skinview3d@1.15.0/build/skinview3d.min.js"></script>
   <style>
     body {
       font-family: sans-serif;
@@ -49,12 +47,14 @@
       align-items: center;
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
-    canvas {
+    img.skin-image {
       width: 200px;
       height: 300px;
       margin-bottom: 1rem;
       border: 2px solid #ba68c8;
       border-radius: 8px;
+      image-rendering: pixelated;
+      background: #fff;
     }
     label, input[type="text"], button {
       margin: 0.25rem 0;
@@ -75,8 +75,6 @@
 <div id="skins"></div>
 
 <script>
-const skins = [];
-
 async function fetchSkin() {
   const mode = document.getElementById('mode').value;
   const mcid = document.getElementById('mcid').value.trim();
@@ -87,7 +85,6 @@ async function fetchSkin() {
 
   try {
     if (mode === "be") {
-      // BEの場合はXUIDを取得してからスキン情報を取得
       const xuidRes = await fetch(`https://api.geysermc.org/v2/xbox/xuid/${encodeURIComponent(mcid)}`);
       if (!xuidRes.ok) throw new Error("XUID取得失敗");
       const xuidJson = await xuidRes.json();
@@ -100,20 +97,18 @@ async function fetchSkin() {
       if (!skinJson.texture_id) throw new Error("texture_idがありません");
       textureUrl = `https://textures.minecraft.net/texture/${skinJson.texture_id}`;
     } else {
-      // Java版はmineskinの画像URLを直接指定
       textureUrl = `https://mineskin.eu/skin/${encodeURIComponent(mcid)}.png`;
     }
 
-    // スキン表示用のコンテナ作成
     const container = document.createElement('div');
     container.className = 'skin-entry';
 
-    // canvas作成してskinview3dでスキン表示
-    const canvas = document.createElement('canvas');
-    container.appendChild(canvas);
-
-    const viewer = new skinview3d.SkinViewer({ canvas, width: 200, height: 300 });
-    viewer.loadSkin(textureUrl);
+    // スキン画像表示
+    const img = document.createElement('img');
+    img.className = 'skin-image';
+    img.src = textureUrl;
+    img.alt = mcid + "のスキン画像";
+    container.appendChild(img);
 
     // ファイル名入力欄
     const label = document.createElement('label');
@@ -132,8 +127,6 @@ async function fetchSkin() {
 
     document.getElementById('skins').appendChild(container);
 
-    skins.push({ name: mcid, url: textureUrl, fileInput: input, viewer });
-
   } catch (e) {
     alert("取得に失敗しました。もう一度お試しください: " + e.message);
   }
@@ -151,7 +144,6 @@ function downloadSkin(url, filename) {
     });
 }
 </script>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
 </body>
 </html>
+      
