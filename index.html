@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>BE/Javaスキンローダー</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/skinview3d@1.15.0/build/skinview3d.min.js"></script>
@@ -62,87 +62,95 @@
   </style>
 </head>
 <body>
-<h1>BE/Javaスキンローダー</h1>
+  <h1>BE/Javaスキンローダー</h1>
 
-<select id="mode">
-  <option value="be">BE</option>
-  <option value="java">Java</option>
-</select>
-<input id="mcid" placeholder="プレイヤー名を入力..." />
-<button onclick="fetchSkin()">取得</button>
+  <select id="mode">
+    <option value="be">BE</option>
+    <option value="java">Java</option>
+  </select>
+  <input id="mcid" placeholder="プレイヤー名を入力..." />
+  <button onclick="fetchSkin()">取得</button>
 
-<hr>
-<div id="skins"></div>
+  <hr />
+  <div id="skins"></div>
 
-<script>
-const skins = [];
+  <script>
+    async function fetchSkin() {
+      const mode = document.getElementById('mode').value;
+      const mcid = document.getElementById('mcid').value.trim();
+      if (!mcid) return alert('プレイヤー名を入力してください');
 
-window.addEventListener('DOMContentLoaded', () => {
-  if (typeof SkinViewer === 'undefined') {
-    console.error('skinview3d ライブラリが読み込まれていません');
-  }
-});
+      let textureUrl = "";
+      let fileName = mcid + ".png";
 
-async function fetchSkin() {
-  const mode = document.getElementById('mode').value;
-  const mcid = document.getElementById('mcid').value;
-  if (!mcid) return alert('プレイヤー名を入力してください');
-  let textureUrl = "";
-  let fileName = mcid + ".png";
+      try {
+        if (mode === "be") {
+          // BE版XUID取得
+          const xuidRes = await fetch(`https://api.geysermc.org/v2/xbox/xuid/${encodeURIComponent(mcid)}`);
+          if (!xuidRes.ok) throw new Error("XUID取得失敗");
+          const xuid = await xuidRes.text();
+          if (!xuid) throw new Error("XUIDが空です");
 
-  try {
-    if (mode === "be") {
-      const xuidRes = await fetch(`https://api.geysermc.org/v2/xbox/xuid/${mcid}`);
-      const xuid = await xuidRes.text();
-      const skinRes = await fetch(`https://api.geysermc.org/v2/skin/${xuid}`);
-      const skinJson = await skinRes.json();
-      textureUrl = `https://textures.minecraft.net/texture/${skinJson.texture_id}`;
-    } else {
-      textureUrl = `https://mineskin.eu/skin/${mcid}.png`;
+          // スキン情報取得
+          const skinRes = await fetch(`https://api.geysermc.org/v2/skin/${xuid}`);
+          if (!skinRes.ok) throw new Error("スキン情報取得失敗");
+          const skinJson = await skinRes.json();
+          if (!skinJson.texture_id) throw new Error("texture_idがありません");
+
+          textureUrl = `https://textures.minecraft.net/texture/${skinJson.texture_id}`;
+        } else {
+          // Java版スキン情報をMineskin APIから取得
+          const res = await fetch(`https://api.mineskin.org/get/user/${encodeURIComponent(mcid)}`);
+          if (!res.ok) throw new Error("Javaスキン情報取得失敗");
+          const json = await res.json();
+          if (!json.data || !json.data.texture || !json.data.texture.value) throw new Error("スキンURLがありません");
+          textureUrl = json.data.texture.value;
+        }
+
+        const container = document.createElement('div');
+        container.className = 'skin-entry';
+
+        const canvas = document.createElement('canvas');
+        container.appendChild(canvas);
+
+        const viewer = new skinview3d.SkinViewer({ canvas, width: 200, height: 300 });
+        viewer.loadSkin(textureUrl);
+
+        viewer.player.skin.image.addEventListener('error', () => {
+          alert('スキン画像の読み込みに失敗しました。URLやCORSを確認してください。');
+        });
+
+        const label = document.createElement('label');
+        label.textContent = "画像ファイル名: ";
+        const input = document.createElement('input');
+        input.value = fileName;
+        input.type = 'text';
+        container.appendChild(label);
+        container.appendChild(input);
+
+        const dlBtn = document.createElement('button');
+        dlBtn.textContent = "スキン単体Download";
+        dlBtn.onclick = () => downloadSkin(textureUrl, input.value);
+        container.appendChild(dlBtn);
+
+        document.getElementById('skins').appendChild(container);
+
+      } catch (e) {
+        alert("取得に失敗しました。もう一度お試しください: " + e.message);
+      }
     }
 
-    console.log("Texture URL:", textureUrl);
-
-    const response = await fetch(textureUrl);
-    const blob = await response.blob();
-    const arrayBuffer = await blob.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-
-    const container = document.createElement('div');
-    container.className = 'skin-entry';
-    const canvas = document.createElement('canvas');
-    container.appendChild(canvas);
-    const viewer = new SkinViewer({ canvas, width: 200, height: 300 });
-    viewer.loadSkin(textureUrl);
-
-    const label = document.createElement('label');
-    label.textContent = "画像ファイル名: ";
-    const input = document.createElement('input');
-    input.value = fileName;
-    input.type = 'text';
-    container.appendChild(label);
-    container.appendChild(input);
-
-    const dlBtn = document.createElement('button');
-    dlBtn.textContent = "スキン単体Download";
-    dlBtn.onclick = () => downloadSkin(base64, input.value);
-    container.appendChild(dlBtn);
-
-    document.getElementById('skins').appendChild(container);
-
-    skins.push({ name: mcid, base64, fileInput: input });
-  } catch (e) {
-    alert("取得に失敗しました。もう一度お試しください: " + e);
-  }
-}
-
-function downloadSkin(base64, filename) {
-  const a = document.createElement('a');
-  a.href = 'data:image/png;base64,' + base64;
-  a.download = filename.endsWith('.png') ? filename : filename + '.png';
-  a.click();
-}
-</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+    function downloadSkin(url, filename) {
+      fetch(url)
+        .then(res => res.blob())
+        .then(blob => {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = filename.endsWith('.png') ? filename : filename + '.png';
+          a.click();
+          URL.revokeObjectURL(a.href);
+        });
+    }
+  </script>
 </body>
 </html>
