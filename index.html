@@ -62,95 +62,96 @@
   </style>
 </head>
 <body>
-  <h1>BE/Javaスキンローダー</h1>
+<h1>BE/Javaスキンローダー</h1>
 
-  <select id="mode">
-    <option value="be">BE</option>
-    <option value="java">Java</option>
-  </select>
-  <input id="mcid" placeholder="プレイヤー名を入力..." />
-  <button onclick="fetchSkin()">取得</button>
+<select id="mode">
+  <option value="be">BE</option>
+  <option value="java">Java</option>
+</select>
+<input id="mcid" placeholder="プレイヤー名を入力..." />
+<button onclick="fetchSkin()">取得</button>
 
-  <hr />
-  <div id="skins"></div>
+<hr />
+<div id="skins"></div>
 
-  <script>
-    async function fetchSkin() {
-      const mode = document.getElementById('mode').value;
-      const mcid = document.getElementById('mcid').value.trim();
-      if (!mcid) return alert('プレイヤー名を入力してください');
+<script>
+const skins = [];
 
-      let textureUrl = "";
-      let fileName = mcid + ".png";
+async function fetchSkin() {
+  const mode = document.getElementById('mode').value;
+  const mcid = document.getElementById('mcid').value.trim();
+  if (!mcid) return alert('プレイヤー名を入力してください');
 
-      try {
-        if (mode === "be") {
-          // BE版XUID取得
-          const xuidRes = await fetch(`https://api.geysermc.org/v2/xbox/xuid/${encodeURIComponent(mcid)}`);
-          if (!xuidRes.ok) throw new Error("XUID取得失敗");
-          const xuid = await xuidRes.text();
-          if (!xuid) throw new Error("XUIDが空です");
+  let textureUrl = "";
+  let fileName = mcid + ".png";
 
-          // スキン情報取得
-          const skinRes = await fetch(`https://api.geysermc.org/v2/skin/${xuid}`);
-          if (!skinRes.ok) throw new Error("スキン情報取得失敗");
-          const skinJson = await skinRes.json();
-          if (!skinJson.texture_id) throw new Error("texture_idがありません");
+  try {
+    if (mode === "be") {
+      // BEの場合はXUIDを取得してからスキン情報を取得
+      const xuidRes = await fetch(`https://api.geysermc.org/v2/xbox/xuid/${encodeURIComponent(mcid)}`);
+      if (!xuidRes.ok) throw new Error("XUID取得失敗");
+      const xuidJson = await xuidRes.json();
+      if (!xuidJson.xuid) throw new Error("XUIDが空です");
 
-          textureUrl = `https://textures.minecraft.net/texture/${skinJson.texture_id}`;
-        } else {
-          // Java版スキン情報をMineskin APIから取得
-          const res = await fetch(`https://api.mineskin.org/get/user/${encodeURIComponent(mcid)}`);
-          if (!res.ok) throw new Error("Javaスキン情報取得失敗");
-          const json = await res.json();
-          if (!json.data || !json.data.texture || !json.data.texture.value) throw new Error("スキンURLがありません");
-          textureUrl = json.data.texture.value;
-        }
+      const skinRes = await fetch(`https://api.geysermc.org/v2/skin/${xuidJson.xuid}`);
+      if (!skinRes.ok) throw new Error("スキン情報取得失敗");
+      const skinJson = await skinRes.json();
 
-        const container = document.createElement('div');
-        container.className = 'skin-entry';
-
-        const canvas = document.createElement('canvas');
-        container.appendChild(canvas);
-
-        const viewer = new skinview3d.SkinViewer({ canvas, width: 200, height: 300 });
-        viewer.loadSkin(textureUrl);
-
-        viewer.player.skin.image.addEventListener('error', () => {
-          alert('スキン画像の読み込みに失敗しました。URLやCORSを確認してください。');
-        });
-
-        const label = document.createElement('label');
-        label.textContent = "画像ファイル名: ";
-        const input = document.createElement('input');
-        input.value = fileName;
-        input.type = 'text';
-        container.appendChild(label);
-        container.appendChild(input);
-
-        const dlBtn = document.createElement('button');
-        dlBtn.textContent = "スキン単体Download";
-        dlBtn.onclick = () => downloadSkin(textureUrl, input.value);
-        container.appendChild(dlBtn);
-
-        document.getElementById('skins').appendChild(container);
-
-      } catch (e) {
-        alert("取得に失敗しました。もう一度お試しください: " + e.message);
-      }
+      if (!skinJson.texture_id) throw new Error("texture_idがありません");
+      textureUrl = `https://textures.minecraft.net/texture/${skinJson.texture_id}`;
+    } else {
+      // Java版はmineskinの画像URLを直接指定
+      textureUrl = `https://mineskin.eu/skin/${encodeURIComponent(mcid)}.png`;
     }
 
-    function downloadSkin(url, filename) {
-      fetch(url)
-        .then(res => res.blob())
-        .then(blob => {
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = filename.endsWith('.png') ? filename : filename + '.png';
-          a.click();
-          URL.revokeObjectURL(a.href);
-        });
-    }
-  </script>
+    // スキン表示用のコンテナ作成
+    const container = document.createElement('div');
+    container.className = 'skin-entry';
+
+    // canvas作成してskinview3dでスキン表示
+    const canvas = document.createElement('canvas');
+    container.appendChild(canvas);
+
+    const viewer = new skinview3d.SkinViewer({ canvas, width: 200, height: 300 });
+    viewer.loadSkin(textureUrl);
+
+    // ファイル名入力欄
+    const label = document.createElement('label');
+    label.textContent = "画像ファイル名: ";
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = fileName;
+    container.appendChild(label);
+    container.appendChild(input);
+
+    // ダウンロードボタン
+    const dlBtn = document.createElement('button');
+    dlBtn.textContent = "スキン単体Download";
+    dlBtn.onclick = () => downloadSkin(textureUrl, input.value);
+    container.appendChild(dlBtn);
+
+    document.getElementById('skins').appendChild(container);
+
+    skins.push({ name: mcid, url: textureUrl, fileInput: input, viewer });
+
+  } catch (e) {
+    alert("取得に失敗しました。もう一度お試しください: " + e.message);
+  }
+}
+
+function downloadSkin(url, filename) {
+  fetch(url)
+    .then(res => res.blob())
+    .then(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename.endsWith('.png') ? filename : filename + '.png';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+}
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
 </body>
 </html>
