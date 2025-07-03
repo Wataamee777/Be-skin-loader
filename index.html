@@ -143,6 +143,32 @@ function downloadSkin(url, filename) {
       URL.revokeObjectURL(a.href);
     });
 }
+// URLパラメータ取得関数
+function getQueryParam(key) {
+  const params = new URLSearchParams(window.location.search);
+  return params.get(key);
+}
+
+// 自動取得処理（ページ読み込み時）
+window.addEventListener("DOMContentLoaded", () => {
+  const skinParam = getQueryParam("skin"); // Xboxゲーマータグなど
+  const modeParam = getQueryParam("mode"); // 省略OK
+
+  if (skinParam) {
+    // モード指定があれば切り替え（なければBEをデフォにする）
+    if (modeParam === "java" || modeParam === "be") {
+      document.getElementById("mode").value = modeParam;
+    } else {
+      document.getElementById("mode").value = "be";
+    }
+
+    // MCID（Xbox名）入力欄に反映
+    document.getElementById("mcid").value = skinParam;
+
+    // 自動取得実行
+    fetchSkin();
+  }
+});
 </script>
 </body>
 </html>
